@@ -96,26 +96,31 @@ for img in imgs:
 	kps.append(kp)
 	descs.append(des)
 
+pw_homos = []
 for i in range(n-1):
 	pwmatches = match(descs[i], descs[i+1])
 	H = estimateHomography(pwmatches, kps[i], kps[i+1])
-	print H
+	pw_homos.append(H)
 
-	proj2 = cv2.warpPerspective(imgs[i+1], H, (imgs[i].shape[1] + imgs[i+1].shape[1], 
-									 imgs[i].shape[0]))
-	
-	img3 = np.zeros(proj2.shape, dtype="uint8")
-	img3[0:imgs[i].shape[0], 0:imgs[i].shape[1]] = imgs[i]
-	#print proj2 > 0
-	img3[proj2 > 0] = proj2[proj2 > 0]
-	plt.figure(figsize=(10,10))
-	plt.imshow(img3)
-	plt.show()
 
-# build_linear-simple
+# stitcher -- build_linear-simple
 mid = n / 2
 # set middle H to I
+homos = [0 for i in range(n)]
+homos[mid] = np.identity(3)
 # for each adjacent image, accumulate H
+for i in range(mid+1, n):
+	homos[i] = np.matmul(homos[i-1], pw_homos[i-1])
+for i in range(mid-1, -1, -1):
+	homos[i] = np.matmul(homos[i+1], np.linalg.inv(pw_homos[i]))
+
+plt.figure(figsize=(10,10))
+for i, img in enumerate(imgs):
+	proj = cv2.warpPerspective(img, homos[i], (img.shape[1]*3, img.shape[0]))
+	plt.subplot(len(imgs),1,i+1)
+	plt.imshow(proj)
+plt.show()
+
 #	- multiply previous by pairwise H
 # f = Camera::estimate_focal(pairwise_matches)
 # multiply H by [[ 1/f  0   0  ]
@@ -126,7 +131,17 @@ mid = n / 2
 # bundle.blend -- returns image
 # crop ?
 
-
+'''
+	proj2 = cv2.warpPerspective(imgs[i+1], H, (imgs[i].shape[1] + imgs[i+1].shape[1], 
+									 imgs[i].shape[0]))
+	
+	img3 = np.zeros(proj2.shape, dtype="uint8")
+	img3[0:imgs[i].shape[0], 0:imgs[i].shape[1]] = imgs[i]
+	#print proj2 > 0
+	img3[proj2 > 0] = proj2[proj2 > 0]
+	plt.figure(figsize=(10,10))
+	plt.imshow(img3)
+	plt.show()'''
 
 '''
 pano = imgs[0]
