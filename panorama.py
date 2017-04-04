@@ -53,21 +53,6 @@ def match(img1, img2):
 	# return true if matches and homography
 	return good, H'''
 
-def merge(img1, img2):
-	
-	_, H = match(img1, img2)
-	
-	proj2 = cv2.warpPerspective(img2, H, (img1.shape[1] + img2.shape[1], 
-									 img1.shape[0]))
-	
-	img3 = np.zeros(proj2.shape, dtype="uint8")
-	img3[0:img1.shape[0], 0:img1.shape[1]] = img1
-	#print proj2 > 0
-	img3[proj2 > 0] = proj2[proj2 > 0]
-	
-	return img3
-
-
 
 # Process command line args
 parser = argparse.ArgumentParser(
@@ -109,44 +94,80 @@ mid = n / 2
 homos = [0 for i in range(n)]
 homos[mid] = np.identity(3)
 # for each adjacent image, accumulate H
+#	- multiply previous by pairwise H
 for i in range(mid+1, n):
 	homos[i] = np.matmul(homos[i-1], pw_homos[i-1])
 for i in range(mid-1, -1, -1):
 	homos[i] = np.matmul(homos[i+1], np.linalg.inv(pw_homos[i]))
 
-plt.figure(figsize=(10,10))
-for i, img in enumerate(imgs):
-	proj = cv2.warpPerspective(img, homos[i], (img.shape[1]*3, img.shape[0]))
-	plt.subplot(len(imgs),1,i+1)
-	plt.imshow(proj)
-plt.show()
 
-#	- multiply previous by pairwise H
+
+
 # f = Camera::estimate_focal(pairwise_matches)
 # multiply H by [[ 1/f  0   0  ]
 #				 [ 0   1/f  0  ]
 #				 [ 0    0  1/f ]]
-# bundle.update_proj_range()
-	# homo2proj = get_homo2proj
+# bundle.update_proj_range() -- stither_image
+	# vector corner = x of Vec2D
+
+'''
+corners = []
+corner_sample = 100
+for i in range(corner_sample):
+	for j in range(corner_sample):
+		corners.append((1.0*i/corner_sample - 0.5, 1.0*j/corner_sample-0.5))
+print max(corners)
+print min(corners)'''
+
+corners = [[0,0], [0, 1], [1, 0], [1,1]]
+
+xMin = None
+xMax = None
+yMin = None
+yMax = None
+for i in range(len(imgs)):
+	for j, corner in enumerate(corners):
+		vec = [corner[0] * imgs[i].shape[1], 
+			corner[1] * imgs[i].shape[0], 1]
+
+		p = np.matmul(homos[i], vec )
+		t_corner = [p[0]/p[2], p[1]/p[2]]
+		
+		xMax = max(xMax, t_corner[0])
+		yMax = max(yMax, t_corner[1])
+		if(xMin == None or t_corner[0] < xMin):
+			xMin = t_corner[0]
+		if(yMin == None or t_corner[1] < yMin):
+			yMin = t_corner[1]
+print "projmin:", xMin, yMin, "projmax:", xMax, yMax
+
+T = [[1, 0, -xMin],
+	 [0, 1, 0],
+	 [0, 0, 1]]
+print T
+
+for i in range(n):
+	homos[i] = np.matmul(T, homos[i])
+
+proj = []
+for i, img in enumerate(imgs):
+	proj.append(cv2.warpPerspective(img, homos[i], (int(xMax-xMin), imgs[mid].shape[0])))
+
+	# for each homography
+		# for each corner
+			# Vec homo = m.homo.trans()
+			# Vec2D t_corner = homo2proj(homo) -- homogeneous to 2D
+
 # bundle.blend -- returns image
 # crop ?
 
-'''
-	proj2 = cv2.warpPerspective(imgs[i+1], H, (imgs[i].shape[1] + imgs[i+1].shape[1], 
-									 imgs[i].shape[0]))
-	
-	img3 = np.zeros(proj2.shape, dtype="uint8")
-	img3[0:imgs[i].shape[0], 0:imgs[i].shape[1]] = imgs[i]
-	#print proj2 > 0
-	img3[proj2 > 0] = proj2[proj2 > 0]
-	plt.figure(figsize=(10,10))
-	plt.imshow(img3)
-	plt.show()'''
+pano = np.zeros(proj[0].shape, dtype="uint8")
+for i in range(mid):
+	pano[proj[i] > 0] = proj[i][proj[i] > 0]
+	if n-i-1 != mid:
+		pano[proj[n-i-1] > 0] = proj[n-i-1][proj[n-i-1] > 0]
+pano[proj[mid] > 0] = proj[mid][proj[mid] > 0]
 
-'''
-pano = imgs[0]
-for img in imgs[1:]:
-	pano = merge(pano, img)
 
 plt.figure(figsize=(10,10))
 for i in range(len(imgs)):
@@ -155,4 +176,4 @@ for i in range(len(imgs)):
 
 plt.subplot(212)
 plt.imshow(pano)
-plt.show()'''
+plt.show()
