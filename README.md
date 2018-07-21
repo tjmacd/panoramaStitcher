@@ -3,10 +3,17 @@
 Automatic panorama stitching program using OpenCV library for python
 
 ## Usage
-panorama.py [-h] imgfile [imgfile ...]
+`python panorama.py [-h] imgfile [imgfile ...]`
 
-## Todo
-- Blending
+## Sample images
+(Photographs taken from http://www.photofit4panorama.com/gallery.html)
+### Input
+![Input images](imgs/input.png)
+### Output
+![Panorama](imgs/output.png)
+
+## Improvements to be made
+- Blending to remove seams
 - Cylindrical projection
-- Automstic image ordering
+- Automatic image ordering
 - Optimization
